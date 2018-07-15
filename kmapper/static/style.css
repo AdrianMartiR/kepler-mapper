@@ -228,6 +228,12 @@ a:hover {
   stroke: #000;
 }
 
+#display .selected .circle {
+  stroke-opacity: 0.6;
+  stroke-width: 7px;
+  stroke: #000;
+}
+
 #print .circle {
   stroke-opacity: 1;
   stroke-width: 2px;

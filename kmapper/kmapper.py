@@ -15,9 +15,12 @@ from sklearn.model_selection import StratifiedKFold, KFold
 from scipy.spatial import distance
 from scipy.sparse import issparse
 
+from .jupyter import display
 from .cover import Cover
 from .nerve import GraphNerve
 from .visuals import init_color_function, format_meta, format_mapper_data, build_histogram, graph_data_distribution
+
+from .http_server import gen_server, get_handler, MutableContainer
 
 
 class KeplerMapper(object):
@@ -433,14 +436,14 @@ class KeplerMapper(object):
                   color_function=None,
                   custom_tooltips=None,
                   custom_meta=None,
-                  path_html="mapper_visualization_output.html",
                   title="Kepler Mapper",
-                  save_file=True,
+                  display_in_jupyter=True,
                   X=None,
                   X_names=[],
                   lens=None,
                   lens_names=[],
-                  show_tooltips=True):
+                  show_tooltips=True,
+                  port=8000):
         """Generate a visualization of the simplicial complex mapper output. Turns the complex dictionary into a HTML/D3.js visualization
 
         Parameters
@@ -448,7 +451,7 @@ class KeplerMapper(object):
         graph : dict
             Simplicial complex output from the `map` method.
 
-        path_html : String
+        path_html : String0:
             file name for outputing the resulting html.
 
         custom_meta: dict
@@ -474,6 +477,9 @@ class KeplerMapper(object):
 
         show_tooltips: bool, default is True.
             If false, completely disable tooltips. This is useful when using output in space-tight pages or will display node data in custom ways.
+
+        port: int
+            Indicates which port should be used for internal communication between this python code and the generated javascript.
 
         Return
         ------
@@ -513,15 +519,13 @@ class KeplerMapper(object):
         mapper_summary = format_meta(graph, custom_meta)
 
         # Find the absolute module path and the static files
-        js_path = os.path.join(os.path.dirname(__file__), 'static', 'kmapper.js')
-        with open(js_path, 'r') as f:
-            js_text = f.read()
-
         css_path = os.path.join(os.path.dirname(__file__), 'static', 'style.css')
         with open(css_path, 'r') as f:
             css_text = f.read()
 
-        # Render the Jinja template, filling fields as appropriate
+        # Render the Jinja templates, filling fields as appropriate
+        js_text = env.get_template('kmapper.js').render(port=port)
+
         template = env.get_template('base.html').render(
             title=title,
             mapper_summary=mapper_summary,
@@ -532,13 +536,31 @@ class KeplerMapper(object):
             css_text=css_text,
             show_tooltips=True)
 
-        if save_file:
-            with open(path_html, "wb") as outfile:
-                if self.verbose > 0:
-                    print("Wrote visualization to: %s" % (path_html))
-                outfile.write(template.encode("utf-8"))
+        address = "http://localhost:{}/".format(port)
 
-        return template
+        if display_in_jupyter:
+            display(path_html=address)
+        print("starting server at {}".format(address))
+
+        final_selection = MutableContainer()
+        httpd = gen_server(
+            get_handler,
+            final_selection,
+            template,
+            env,
+            graph,
+            port=port,
+            color_function=color_function,
+            custom_tooltips=custom_tooltips,
+            X=X,
+            X_names=X_names,
+            lens=lens,
+            lens_names=lens_names)
+
+        while final_selection.get() is None:
+            httpd.handle_request()
+
+        return final_selection.get()
 
     def data_from_cluster_id(self, cluster_id, graph, data):
         """Returns the original data of each cluster member for a given cluster ID

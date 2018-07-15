@@ -46,6 +46,7 @@ Temporary Items
 # Python dev files
 __pycache__
 .cache
+.idea
 build
 venv
 venv2

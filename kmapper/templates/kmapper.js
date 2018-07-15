@@ -64,6 +64,17 @@ var svg = d3.select("#canvas").append("svg")
 svg.style("cursor","move");
 var g = svg.append("g");
 
+function getRequest(url, callback) {
+    var xmlHttp = new XMLHttpRequest();
+
+    xmlHttp.onreadystatechange = function() {
+        if (xmlHttp.readyState == 4 && xmlHttp.status == 200)
+            callback(xmlHttp.responseText);
+    }
+    xmlHttp.open("GET", url, true); // true for asynchronous
+    xmlHttp.send(null);
+}
+
 
 ////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////
@@ -112,6 +123,13 @@ d3.select("#help_control").on("click", function() {
   toggle_pane(helptip_content, 
               d3.select("#helptip_content"),
               d3.select("#helptip_tag")[0][0])
+});
+
+d3.select("#return_selection").on("click", function() {
+  selected_indexes = node.filter(".selected").data().map(d => d.index);
+  url = "http://localhost:{{ port }}/return_selection?"
+                    + JSON.stringify(selected_indexes);
+  getRequest(url, null);
 });
 
 
@@ -241,8 +259,6 @@ if (text_center) {
 }
 
 
-
-
 ////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////
@@ -254,44 +270,65 @@ if (text_center) {
 ////////////////////////////////////////////////////////////////////////////////
 
 // Mouse events
-node.on("mouseover", function(d) {
-  // Change node details
-  set_highlight(d);
-  d3.select("#tooltip_content").html(d.tooltip + "<br/>");
-}).on("mousedown", function(d) {
-  // TODO: This seems to only stop the one particular node from moving?
-
-  d3.event.stopPropagation();
-  focus_node = d;
-  if (highlight_node === null) {
-    set_highlight(d)
-  }
-}).on("mouseout", function(d) {
-  exit_highlight();
-});
-
-d3.select(window).on("mouseup", function() {
-  if (focus_node!==null){
-    focus_node = null;
-  }
-  if (highlight_node === null) {
-    exit_highlight();
-  }
-});
-
-// Node highlighting logic
-function exit_highlight(){
-  highlight_node = null;
-  if (focus_node===null){
-    svg.style("cursor","move");
-  }
+function dragended(d) {
+  d.fixed &= ~6;
 }
 
-function set_highlight(d){
+function dragstarted(d) {
+  d3.event.sourceEvent.stopPropagation();
+  d.fixed |= 2;
+}
+function dragged(d) {
+  d.x += d3.event.dx;
+  d.y += d3.event.dy;
+
+  d.px += d3.event.dx;
+  d.py += d3.event.dy;
+
+  force.resume();
+}
+
+node.on("click", function(d) {
+  if (d3.event.defaultPrevented) return;
+  previouslySelected = d.selected
+
+  if (!d3.event.shiftKey) {
+      //if the shift key isn't down, unselect everything
+      node.classed("selected", function(p) { p.selected = false; })
+  }
+
+  d3.select(this).classed("selected", d.selected = !previouslySelected);
+
   svg.style("cursor","pointer");
-  if (focus_node!==null) d = focus_node;
-}
 
+  selected_indexes = node.filter(".selected").data().map(d => d.index);
+
+  if (selected_indexes.length !== 0) {
+    url = "http://localhost:{{ port }}/tooltip?" + JSON.stringify(selected_indexes);
+
+    getRequest(url, function(tooltip) {
+    d3.select("#tooltip_content").html(tooltip + "<br/>");
+    });
+  }
+}).on("mouseover", function(d) {
+  svg.style("cursor","pointer");
+}).call(d3.behavior.drag()
+    .on("dragstart", dragstarted)
+    .on("drag", dragged)
+    .on("dragend", dragended));
+
+    function tick() {
+        link.attr("x1", function(d) { return d.source.x; })
+        .attr("y1", function(d) { return d.source.y; })
+        .attr("x2", function(d) { return d.target.x; })
+        .attr("y2", function(d) { return d.target.y; });
+
+        node.attr('cx', function(d) { return d.x; })
+        .attr('cy', function(d) { return d.y; });
+
+    };
+
+    force.on("tick", tick);
 
 // Zoom logic
 zoom.on("zoom", function() {
