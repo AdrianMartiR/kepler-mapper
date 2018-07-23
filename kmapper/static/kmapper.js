@@ -106,29 +106,40 @@ var toggle_pane = function(content, content_id, tag){
 }
 
 d3.select("#tooltip_control").on("click", function() {
-  toggle_pane(tooltip_content, 
-              d3.select("#tooltip_content"), 
+  toggle_pane(tooltip_content,
+              d3.select("#tooltip_content"),
               d3.select("#tooltip_tag")[0][0]);
 
 });
 
 d3.select("#meta_control").on("click", function() {
-  toggle_pane(meta_content, 
+  toggle_pane(meta_content,
               d3.select("#meta_content"),
               d3.select("#meta_tag")[0][0])
 
 });
 
 d3.select("#help_control").on("click", function() {
-  toggle_pane(helptip_content, 
+  toggle_pane(helptip_content,
               d3.select("#helptip_content"),
               d3.select("#helptip_tag")[0][0])
 });
 
-d3.select("#return_selection").on("click", function() {
+d3.select("#save_cluster").on("click", function() {
   selected_indexes = node.filter(".selected").data().map(d => d.index);
-  url = "http://localhost:{{ port }}/return_selection?"
-                    + JSON.stringify(selected_indexes);
+  cluster_name = d3.select("#cluster_name").property("value")
+  if (cluster_name == "") {
+    alert("Please enter a name before attemting to save a cluster.")
+  } else {
+    query = {name: cluster_name, indexes: selected_indexes}
+    url = [location.protocol, '//', location.host, "/save_cluster?",
+                            JSON.stringify(query)].join('');
+    getRequest(url, null);
+  }
+});
+
+d3.select("#exit").on("click", function() {
+  url = [location.protocol, '//', location.host, "/exit?"].join('');
   getRequest(url, null);
 });
 
@@ -156,7 +167,7 @@ var color = d3.scale.ordinal()
 
 var graph = JSON.parse(document.getElementById("json_graph").dataset.graph);
 
-              
+
 // Force settings
 var force = d3.layout.force()
             .linkDistance(5)
@@ -238,7 +249,7 @@ var circle = node.append("path")
 //.style("filter", "url(#drop-shadow)");
 
 
-// Format all text 
+// Format all text
 var text = g.selectAll(".text")
   .data(graph.nodes)
   .enter().append("text")
@@ -304,7 +315,8 @@ node.on("click", function(d) {
   selected_indexes = node.filter(".selected").data().map(d => d.index);
 
   if (selected_indexes.length !== 0) {
-    url = "http://localhost:{{ port }}/tooltip?" + JSON.stringify(selected_indexes);
+    url = [location.protocol, '//', location.host, "/tooltip?", JSON.stringify(selected_indexes)].join('');
+    console.log(url)
 
     getRequest(url, function(tooltip) {
     d3.select("#tooltip_content").html(tooltip + "<br/>");
@@ -387,13 +399,13 @@ function isNumber(n) {
 }
 
 // Key press events
-window.addEventListener("keydown", function (event) {
-if (event.defaultPrevented) {
-  return; // Do nothing if the event was already processed
+d3.select("body").on("keydown", function (event) {
+if (d3.event.defaultPrevented || (document.activeElement.tagName == 'INPUT')) {
+  return; // Do nothing if the event was already processed or the user is writing on the text field
 }
 
 
-switch (event.key) {
+switch (d3.event.key) {
   case "f":
     console.log("Freeze graph")
     break;

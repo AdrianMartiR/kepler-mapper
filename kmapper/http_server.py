@@ -8,13 +8,8 @@ from .visuals import format_tooltip
 
 class MutableContainer:
     def __init__(self):
-        self.value = None
-
-    def set(self, value):
-        self.value = value
-
-    def get(self):
-        return self.value
+        self.value = {}
+        self.finished = False
 
 
 def gen_server(get_handler, *args, port=8000, **kwargs):
@@ -38,7 +33,7 @@ def return_html(request_handler, html):
 
 
 def get_handler(request_handler,
-                final_selection: MutableContainer,
+                clusters: MutableContainer,
                 template,
                 env,
                 graph,
@@ -55,7 +50,7 @@ def get_handler(request_handler,
         return_html(request_handler, template)
 
     elif parsed_path.path == "/tooltip":
-        cluster_ids = json.loads(parsed_path.query)
+        cluster_ids = json.loads(urllib.parse.unquote(parsed_path.query))
 
         member_ids = [list(graph["nodes"].items())[i][1] for i in cluster_ids]
         member_ids = reduce((lambda x, y: set(x).union(set(y))), member_ids)
@@ -66,7 +61,16 @@ def get_handler(request_handler,
 
         return_html(request_handler, tooltip)
 
-    elif parsed_path.path == "/return_selection":
-        final_selection.set(json.loads(parsed_path.query))
+    elif parsed_path.path == "/save_cluster":
+        print(parsed_path.query)
+        parsed_query = json.loads(urllib.parse.unquote(parsed_path.query))
+
+        current_clusters = clusters.value
+        current_clusters[parsed_query["name"]] = parsed_query["indexes"]
+        clusters.value = current_clusters
+
         return_html(request_handler, "")
 
+    elif parsed_path.path == "/exit":
+        clusters.finished = True
+        return_html(request_handler, "")

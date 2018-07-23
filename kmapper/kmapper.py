@@ -44,7 +44,7 @@ class KeplerMapper(object):
 
         verbose: int, default is 0
             Logging level. Currently 3 levels (0,1,2) are supported.
-                - for no logging, set `verbose=0`, 
+                - for no logging, set `verbose=0`,
                 - for some logging, set `verbose=1`,
                 - for complete logging, set `verbose=2`
         """
@@ -272,7 +272,7 @@ class KeplerMapper(object):
         precomputed : Boolean
             Tell Mapper whether the data that you are clustering on is a precomputed distance matrix. If set to
             `True`, the assumption is that you are also telling your `clusterer` that `metric='precomputed'` (which
-            is an argument for DBSCAN among others), which 
+            is an argument for DBSCAN among others), which
             will then cause the clusterer to expect a square distance matrix for each hypercube. `precomputed=True` will give a square matrix
             to the clusterer to fit on for each hypercube.
 
@@ -344,7 +344,7 @@ class KeplerMapper(object):
         # to adjust for the minimal number of samples inside an interval before
         # we consider clustering or skipping it.
         cluster_params = clusterer.get_params()
-        
+
         min_cluster_samples = cluster_params.get("n_clusters", None)
         if min_cluster_samples is None:
             min_cluster_samples = cluster_params.get("min_cluster_size", 1)
@@ -374,7 +374,7 @@ class KeplerMapper(object):
                 # Note that we apply clustering on the inverse image (original data samples) that fall inside the cube.
                 ids = [int(nn) for nn in hypercube[:, 0]]
                 X_cube = X[ids]
-                
+
                 X_cube = X[[int(nn) for nn in hypercube[:, 0]]]
                 fit_data = X_cube[:, 1:]
                 if precomputed:
@@ -435,6 +435,7 @@ class KeplerMapper(object):
     def visualize(self,
                   graph,
                   color_function=None,
+                  max_prop=1,
                   custom_tooltips=None,
                   custom_meta=None,
                   title="Kepler Mapper",
@@ -452,11 +453,16 @@ class KeplerMapper(object):
         graph : dict
             Simplicial complex output from the `map` method.
 
+        max_prop : float
+            Used for coloring clusters. Sets the proportion (positive_label_count / total_labels) that has
+            the maximum color. Makes it much easier to visualize datasets with imbalanced classes, as otherwise all
+            clusters have the same color.
+
         path_html : String0:
             file name for outputing the resulting html.
 
         custom_meta: dict
-            Render (key, value) in the Mapper Summary pane. 
+            Render (key, value) in the Mapper Summary pane.
 
         custom_tooltip: list or array like
             Value to display for each entry in the node. The cluster data pane will display entry for all values in the node. Default is index of data.
@@ -492,7 +498,7 @@ class KeplerMapper(object):
         -------
 
         >>> mapper.visualize(simplicial_complex, path_html="mapper_visualization_output.html",
-                            custom_meta={'Data': 'MNIST handwritten digits', 
+                            custom_meta={'Data': 'MNIST handwritten digits',
                                          'Created by': 'Franklin Roosevelt'
                             }, )
 
@@ -511,22 +517,23 @@ class KeplerMapper(object):
         # Color function is a vector of colors?
         color_function = init_color_function(graph, color_function)
 
-        mapper_data = format_mapper_data(graph, color_function, X,
-                                         X_names, lens,
-                                         lens_names, custom_tooltips, env)
+        mapper_data = format_mapper_data(graph, color_function, max_prop)
 
         histogram = graph_data_distribution(graph, color_function)
 
         mapper_summary = format_meta(graph, custom_meta)
 
         # Find the absolute module path and the static files
+        js_path = os.path.join(os.path.dirname(__file__), 'static', 'kmapper.js')
+        with open(js_path, 'r') as f:
+            js_text = f.read()
+
+        # Find the absolute module path and the static files
         css_path = os.path.join(os.path.dirname(__file__), 'static', 'style.css')
         with open(css_path, 'r') as f:
             css_text = f.read()
 
-        # Render the Jinja templates, filling fields as appropriate
-        js_text = env.get_template('kmapper.js').render(port=port)
-
+        # Render the Jinja template, filling fields as appropriate
         template = env.get_template('base.html').render(
             title=title,
             mapper_summary=mapper_summary,
@@ -558,10 +565,10 @@ class KeplerMapper(object):
             lens=lens,
             lens_names=lens_names)
 
-        while final_selection.get() is None:
+        while not final_selection.finished:
             httpd.handle_request()
 
-        return final_selection.get()
+        return final_selection.value
 
     def data_from_cluster_id(self, cluster_id, graph, data):
         """Returns the original data of each cluster member for a given cluster ID

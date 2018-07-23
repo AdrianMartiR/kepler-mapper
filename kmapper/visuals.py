@@ -28,6 +28,7 @@ def init_color_function(graph, color_function=None):
     # MinMax Scaling to be friendly to non-scaled input.
     scaler = preprocessing.MinMaxScaler()
     color_function = scaler.fit_transform(color_function).ravel()
+
     return color_function
 
 
@@ -50,14 +51,13 @@ def format_meta(graph, custom_meta=None):
     return mapper_summary
 
 
-def format_mapper_data(graph, color_function, X,
-                       X_names, lens, lens_names, custom_tooltips, env):
+def format_mapper_data(graph, color_function, max_prop):
     # import pdb; pdb.set_trace()
     json_dict = {"nodes": [], "links": []}
     node_id_to_num = {}
     for i, (node_id, member_ids) in enumerate(graph["nodes"].items()):
         node_id_to_num[node_id] = i
-        c = _color_function(member_ids, color_function)
+        c = _color_function(member_ids, color_function, max_prop)
         t = _type_node()
         s = _size_node(member_ids)
 
@@ -216,8 +216,14 @@ def format_tooltip(env, member_ids, custom_tooltips, X,
     return tooltip
 
 
-def _color_function(member_ids, color_function):
-    return _color_idx(np.mean(color_function[member_ids]))
+def _color_function(member_ids, color_function, max_proportion):
+    raw_color_value = np.mean(color_function[member_ids])
+
+    regularized = raw_color_value / max_proportion
+    if regularized > 1:
+        regularized = 1
+
+    return _color_idx(regularized)
     # return int(np.mean(color_function[member_ids]) * 30)
 
 
